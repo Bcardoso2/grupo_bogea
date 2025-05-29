@@ -1,26 +1,25 @@
-// server/src/models/Document.js - VERSÃO CORRIGIDA
+// server/src/models/Document.js - VERSÃO AJUSTADA PARA CLOUDINARY
 const { pool } = require('../config/database');
-const fs = require('fs');
-const path = require('path');
 
 class Document {
-  static async create({ title, description, file_path, file_type, file_size, category, client_id, status, uploaded_by }) {
+  static async create({ title, description, file_url, public_id, file_type, file_size, category, client_id, status, uploaded_by }) {
     try {
       const query = `
         INSERT INTO documents 
-        (title, description, file_path, file_type, file_size, category, client_id, status, uploaded_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (title, description, file_url, public_id, file_type, file_size, category, client_id, status, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
       const [result] = await pool.execute(query, [
-        title, description, file_path, file_type, file_size, category, client_id, status, uploaded_by
+        title, description, file_url, public_id, file_type, file_size, category, client_id, status, uploaded_by
       ]);
       
       return {
         id: result.insertId,
         title,
         description,
-        file_path,
+        file_url,
+        public_id,
         file_type,
         file_size,
         category,
@@ -100,9 +99,6 @@ class Document {
 
         results = await pool.query(query, params);
       } else {
-        console.log('📋 Query findAll (sem paginação):', query);
-        console.log('📋 Params findAll:', params);
-
         results = await pool.execute(query, params);
       }
 
@@ -136,10 +132,7 @@ class Document {
         throw new Error('Documento não encontrado');
       }
 
-      const filePath = path.join(__dirname, '../..', document.file_path);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      // ❌ REMOVIDO: fs.unlinkSync — não usamos mais arquivos locais
 
       const query = `DELETE FROM documents WHERE id = ?`;
       await pool.execute(query, [id]);
@@ -178,9 +171,6 @@ class Document {
         query += ` AND status = ?`;
         params.push(filters.status);
       }
-
-      console.log('🔢 Query count:', query);
-      console.log('🔢 Params count:', params);
 
       const [rows] = await pool.execute(query, params);
       return rows[0].total;

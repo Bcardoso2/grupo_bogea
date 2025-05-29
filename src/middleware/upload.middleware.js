@@ -1,51 +1,70 @@
- 
-// server/src/middleware/upload.middleware.js
-const { uploadDocument } = require('../config/multer');
-const { error } = require('../utils/responseHelper');
+// ===== 2. MIDDLEWARE DE UPLOAD ATUALIZADO (middlewares/uploadMiddleware.js) =====
+const multer = require('multer');
+const path = require('path');
 
-const uploadSingle = (fieldName = 'file') => {
-  return (req, res, next) => {
-    const upload = uploadDocument.single(fieldName);
+// Usar memoryStorage para o Cloudinary
+const storage = multer.memoryStorage();
+
+const fileFilter = (req, file, cb) => {
+  const allowedMimes = [
+    // Documentos
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     
-    upload(req, res, (err) => {
-      if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return error(res, 'Arquivo excede o tamanho máximo de 10MB', 400);
-        }
-        return error(res, err.message, 400);
-      }
-      
-      if (!req.file) {
-        return error(res, 'Nenhum arquivo foi enviado', 400);
-      }
-      
-      next();
-    });
-  };
+    // Imagens
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+    
+    // Texto
+    'text/plain',
+    'text/csv',
+    'application/json',
+    
+    // Áudio
+    'audio/mpeg',
+    'audio/wav',
+    'audio/ogg',
+    
+    // Vídeo
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+    
+    // Outros
+    'application/zip'
+  ];
+
+  const fileExtension = path.extname(file.originalname).toLowerCase();
+  
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Tipo de arquivo não permitido: ${file.mimetype} (${fileExtension})`), false);
+  }
 };
 
-const uploadMultiple = (fieldName = 'files', maxCount = 5) => {
-  return (req, res, next) => {
-    const upload = uploadDocument.array(fieldName, maxCount);
-    
-    upload(req, res, (err) => {
-      if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return error(res, 'Um ou mais arquivos excedem o tamanho máximo', 400);
-        }
-        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-          return error(res, `Número máximo de arquivos excedido (máximo ${maxCount})`, 400);
-        }
-        return error(res, err.message, 400);
-      }
-      
-      if (!req.files || req.files.length === 0) {
-        return error(res, 'Nenhum arquivo foi enviado', 400);
-      }
-      
-      next();
-    });
-  };
-};
 
-module.exports = { uploadSingle, uploadMultiple };
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB (Cloudinary suporta até 100MB no plano gratuito)
+    files: 10 // Até 10 arquivos simultâneos
+  },
+  fileFilter: fileFilter
+});
+
+
+
+const uploadSingle = (fieldName) => upload.single(fieldName);
+
+module.exports = { upload, uploadSingle };
