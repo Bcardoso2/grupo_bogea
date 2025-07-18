@@ -1,9 +1,12 @@
 // server/src/controllers/projectController.js
 const Project = require('../models/Project');
-const ProjectTask = require('../models/ProjectTask'); // Adicionado ProjectTask para as rotas de tarefa
-const { success, error, created, notFound, unauthorized } = require('../utils/responseHelper'); // Adicionado unauthorized
+const ProjectTask = require('../models/ProjectTask');
+const { success, error, created, notFound } = require('../utils/responseHelper'); // Removi 'unauthorized' se não estiver sendo usado explicitamente
 const asyncHandler = require('../utils/asyncHandler');
-// Não é necessário importar 'jwt' ou 'generateToken' aqui, pois não são usados neste controller
+
+// Funções auxiliares (se existirem ou forem necessárias, como generateToken)
+// const jwt = require('jsonwebtoken'); // Descomente se usar JWT diretamente aqui
+// const generateToken = (payload) => { /* ... sua lógica de token ... */ };
 
 exports.getProjects = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, search, status, client_id, manager_id } = req.query;
@@ -15,7 +18,6 @@ exports.getProjects = asyncHandler(async (req, res) => {
     search: search === '' ? undefined : search,
     status: status === '' ? undefined : status,
     // Converte para inteiro se existir e não for vazio, caso contrário, undefined.
-    // Usamos 'undefined' para que o modelo saiba ignorar o filtro
     client_id: client_id === '' ? undefined : (client_id ? parseInt(client_id) : undefined),
     manager_id: manager_id === '' ? undefined : (manager_id ? parseInt(manager_id) : undefined)
   };
@@ -26,8 +28,8 @@ exports.getProjects = asyncHandler(async (req, res) => {
   success(res, {
     projects,
     pagination: {
-      page: filters.page, // Use o valor já parseado
-      limit: filters.limit, // Use o valor já parseado
+      page: filters.page,
+      limit: filters.limit,
       total,
       pages: Math.ceil(total / filters.limit)
     }
@@ -46,49 +48,65 @@ exports.getProject = asyncHandler(async (req, res) => {
 });
 
 exports.createProject = asyncHandler(async (req, res) => {
-  // Adicionado 'progress: 0' como default aqui também, para maior robustez
-  const { name, description, client_id, contract_id, start_date, deadline, status = 'planning', progress = 0, manager_id } = req.body;
+  // Desestruture apenas os campos permitidos para criação.
+  // 'progress' é inicializado no modelo, então não o receba do req.body.
+  const { name, description, client_id, contract_id, start_date, deadline, status, manager_id, type_requirement, ...specificDetails } = req.body;
 
-  // Validações básicas (opcional, mas recomendado)
+  // Validações básicas
   if (!name || !client_id || !manager_id || !start_date) {
     return error(res, 'Nome, Cliente, Responsável e Data de Início são obrigatórios.', 400);
   }
 
-  const project = await Project.create({
+  const projectData = {
     name,
     description,
     client_id,
-    contract_id,
+    contract_id, // Pode ser null ou undefined se não for obrigatório
     start_date,
     deadline,
-    status,
-    progress,
-    manager_id
-  });
+    status: status || 'planning', // Garante um status padrão
+    progress: 0, // Sempre inicia com 0 na criação
+    manager_id,
+    type_requirement: type_requirement || undefined, // Inclui o tipo de requerimento
+  };
+
+  const project = await Project.create(projectData);
+
+  // TODO: Lógica para salvar campos específicos (specificDetails)
+  // Se você tiver tabelas separadas para Salário Maternidade, BPC, Aposentadoria,
+  // essa lógica deve ser implementada aqui, usando o `project.id` recém-criado.
+  // Exemplo: if (type_requirement === 'Salário Maternidade') { await ProjectSalarioMaternidade.create({ projectId: project.id, ...specificDetails }); }
 
   created(res, project, 'Projeto criado com sucesso');
 });
 
 exports.updateProject = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, description, contract_id, start_date, deadline, status, progress, manager_id } = req.body;
+  // Receba todos os campos que podem ser atualizados
+  const { name, description, contract_id, start_date, deadline, status, progress, manager_id, type_requirement, ...specificDetails } = req.body;
 
   const existingProject = await Project.findById(id);
   if (!existingProject) {
     return notFound(res, 'Projeto não encontrado');
   }
 
-  const updatedProject = await Project.update(id, {
+  const updatedData = {
     name,
     description,
-    // Garante que contract_id é tratado corretamente se for opcional e vier como null/undefined/''
-    contract_id: contract_id === '' ? undefined : contract_id, // Para DBs que preferem null ao invés de vazio
+    contract_id: contract_id === '' ? null : contract_id, // Converte '' para null se seu DB preferir
     start_date,
     deadline,
     status,
     progress,
-    manager_id
-  });
+    manager_id,
+    type_requirement: type_requirement || undefined,
+  };
+
+  const updatedProject = await Project.update(id, updatedData);
+
+  // TODO: Lógica para atualizar campos específicos (specificDetails)
+  // Similar à criação, mas para atualização.
+  // Exemplo: if (type_requirement === 'Salário Maternidade') { await ProjectSalarioMaternidade.update(id, specificDetails); }
 
   success(res, updatedProject, 'Projeto atualizado com sucesso');
 });
@@ -121,8 +139,7 @@ exports.getProjectTasks = asyncHandler(async (req, res) => {
     priority: priority === '' ? undefined : priority,
     assigned_to: assigned_to === '' ? undefined : (assigned_to ? parseInt(assigned_to) : undefined)
   };
-  // A função findByProject do modelo ProjectTask precisa saber lidar com esses filtros
-  const tasks = await ProjectTask.findByProject(id, filters); // ID do projeto é o primeiro argumento
+  const tasks = await ProjectTask.findByProject(id, filters);
 
   success(res, tasks);
 });
@@ -142,12 +159,12 @@ exports.createProjectTask = asyncHandler(async (req, res) => {
   }
 
   const task = await ProjectTask.create({
-    project_id: id, // Certifique-se que o modelo ProjectTask.create espera project_id aqui
+    project_id: id,
     title,
     description,
     status,
     priority,
-    assigned_to, // O frontend enviará o ID do usuário (number)
+    assigned_to,
     start_date,
     due_date
   });
