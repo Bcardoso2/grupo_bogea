@@ -69,14 +69,14 @@ class Project {
       const params = [];
 
       // --- INÍCIO DAS MUDANÇAS AQUI ---
-      // Verifique se o filtro existe e não é undefined/null
-      // Para IDs (client_id, manager_id), verifique se é um número válido (não NaN)
+      // Para IDs (client_id, manager_id), verificamos se é um número válido (não NaN)
+      // e também se não é undefined.
       if (filters.client_id !== undefined && !isNaN(filters.client_id)) {
         query += ` AND p.client_id = ?`;
         params.push(filters.client_id);
       }
 
-      if (filters.status !== undefined) { // String vazia pode ser um status válido, então apenas undefined
+      if (filters.status !== undefined && filters.status !== '') { // Verifica undefined E string vazia
         query += ` AND p.status = ?`;
         params.push(filters.status);
       }
@@ -86,9 +86,11 @@ class Project {
         params.push(filters.manager_id);
       }
 
-      if (filters.search !== undefined && filters.search !== '') { // Verifique se não é undefined ou string vazia
+      // Para 'search', que usa 2 placeholders, adicione 2 parâmetros.
+      if (filters.search !== undefined && filters.search !== '') {
         query += ` AND (p.name LIKE ? OR p.description LIKE ?)`;
-        params.push(`%${filters.search}%`, `%${filters.search}%`);
+        params.push(`%${filters.search}%`); // Primeiro parâmetro para p.name
+        params.push(`%${filters.search}%`); // Segundo parâmetro para p.description
       }
       // --- FIM DAS MUDANÇAS AQUI ---
 
@@ -150,7 +152,7 @@ class Project {
         params.push(filters.client_id);
       }
 
-      if (filters.status !== undefined) {
+      if (filters.status !== undefined && filters.status !== '') {
         query += ` AND status = ?`;
         params.push(filters.status);
       }
@@ -162,7 +164,8 @@ class Project {
 
       if (filters.search !== undefined && filters.search !== '') {
         query += ` AND (name LIKE ? OR description LIKE ?)`;
-        params.push(`%${filters.search}%`, `%${filters.search}%`);
+        params.push(`%${filters.search}%`);
+        params.push(`%${filters.search}%`);
       }
       // --- FIM DAS MUDANÇAS AQUI ---
 
