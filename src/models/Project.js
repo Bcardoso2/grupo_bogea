@@ -68,15 +68,14 @@ class Project {
 
       const params = [];
 
-      // --- INÍCIO DAS MUDANÇAS AQUI ---
-      // Para IDs (client_id, manager_id), verificamos se é um número válido (não NaN)
-      // e também se não é undefined.
+      // --- INÍCIO DAS MUDANÇAS FINAIS AQUI ---
+      // IMPORTANTE: Adicione o parâmetro SOMENTE SE a condição for verdadeira
       if (filters.client_id !== undefined && !isNaN(filters.client_id)) {
         query += ` AND p.client_id = ?`;
         params.push(filters.client_id);
       }
 
-      if (filters.status !== undefined && filters.status !== '') { // Verifica undefined E string vazia
+      if (filters.status !== undefined && filters.status !== '') {
         query += ` AND p.status = ?`;
         params.push(filters.status);
       }
@@ -86,24 +85,24 @@ class Project {
         params.push(filters.manager_id);
       }
 
-      // Para 'search', que usa 2 placeholders, adicione 2 parâmetros.
       if (filters.search !== undefined && filters.search !== '') {
         query += ` AND (p.name LIKE ? OR p.description LIKE ?)`;
         params.push(`%${filters.search}%`); // Primeiro parâmetro para p.name
         params.push(`%${filters.search}%`); // Segundo parâmetro para p.description
       }
-      // --- FIM DAS MUDANÇAS AQUI ---
+      // --- FIM DAS MUDANÇAS FINAIS AQUI ---
 
       query += ` ORDER BY p.created_at DESC`;
 
+      // A paginação sempre tem LIMIT e OFFSET, então esses parâmetros são sempre adicionados
       if (filters.page && filters.limit) {
         const offset = (filters.page - 1) * filters.limit;
         query += ` LIMIT ? OFFSET ?`;
         params.push(Number(filters.limit), Number(offset));
       }
 
-      console.log('DEBUG SQL - findAll Query:', query); // Para depuração
-      console.log('DEBUG SQL - findAll Params:', params); // Para depuração
+      console.log('DEBUG SQL - findAll Query:', query);
+      console.log('DEBUG SQL - findAll Params:', params);
 
       const [rows] = await pool.execute(query, params);
       return rows;
@@ -146,7 +145,7 @@ class Project {
       let query = `SELECT COUNT(*) as total FROM projects WHERE 1=1`;
       const params = [];
 
-      // --- INÍCIO DAS MUDANÇAS AQUI (igual a findAll) ---
+      // --- INÍCIO DAS MUDANÇAS FINAIS AQUI (igual a findAll) ---
       if (filters.client_id !== undefined && !isNaN(filters.client_id)) {
         query += ` AND client_id = ?`;
         params.push(filters.client_id);
@@ -167,10 +166,10 @@ class Project {
         params.push(`%${filters.search}%`);
         params.push(`%${filters.search}%`);
       }
-      // --- FIM DAS MUDANÇAS AQUI ---
+      // --- FIM DAS MUDANÇAS FINAIS AQUI ---
 
-      console.log('DEBUG SQL - count Query:', query); // Para depuração
-      console.log('DEBUG SQL - count Params:', params); // Para depuração
+      console.log('DEBUG SQL - count Query:', query);
+      console.log('DEBUG SQL - count Params:', params);
 
       const [rows] = await pool.execute(query, params);
       return rows[0].total;
