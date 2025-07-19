@@ -1,11 +1,11 @@
 // server/src/routes/project.routes.js
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../config/database'); // <--- ESSA LINHA É CRUCIAL PARA O TESTE
+const { pool } = require('../config/database'); // Importe o pool aqui!
 
 const {
   getProjects,
-  getProject,
+  getProject, // getProject é para /:id
   createProject,
   updateProject,
   deleteProject,
@@ -18,25 +18,55 @@ const { authMiddleware } = require('../middleware/auth.middleware');
 const { validate } = require('../middleware/validation.middleware');
 const { createProjectValidator, updateProjectValidator } = require('../validators/projectValidator');
 
-// --- NOVO ENDPOINT DE TESTE TEMPORÁRIO (DEVE ESTAR AQUI) ---
-router.get('/test-db-query', async (req, res) => {
+// --- PONTO CRÍTICO: COLOQUE A ROTA DE DEBUG AQUI (ANTES DE QUALQUER :ID OU router.use) ---
+router.get('/debug-projects', authMiddleware, async (req, res) => { // Protegido por authMiddleware
   try {
-    const testQuery = 'SELECT 1 + 1 AS solution';
-    const [rows] = await pool.execute(testQuery); // <--- 'pool' precisa estar definido aqui
-    console.log('TESTE DB: Query simples executada:', rows);
-    res.json({ success: true, message: 'Teste de query simples OK', data: rows[0] });
+    const testFilters = {
+      page: 1,
+      limit: 10,
+      search: undefined,
+      status: undefined,
+      client_id: undefined,
+      manager_id: undefined
+    };
+
+    console.log('DEBUG_TEST: Filters sent to Project.findAll:', testFilters);
+
+    // Importe o modelo DENTRO da rota ou no topo do arquivo se não estiver lá
+    const ProjectModel = require('../models/Project'); 
+    const projects = await ProjectModel.findAll(testFilters); // Chamada correta para findAll
+    const total = await ProjectModel.count(testFilters); // Chamada correta para count
+
+    console.log('DEBUG_TEST: Projects found:', projects.length);
+    res.json({
+      success: true,
+      message: 'Debug query OK',
+      data: {
+        projects,
+        pagination: {
+          page: testFilters.page,
+          limit: testFilters.limit,
+          total,
+          pages: Math.ceil(total / testFilters.limit)
+        }
+      }
+    });
   } catch (error) {
-    console.error('TESTE DB: ERRO NA QUERY SIMPLES:', error);
-    res.status(500).json({ success: false, message: 'Erro no teste de query simples', error: error.message });
+    console.error('DEBUG_TEST: ERRO NA QUERY DE DEBUG:', error);
+    res.status(500).json({ success: false, message: 'Erro na query de debug', error: error.message });
   }
 });
-// --- FIM DO NOVO ENDPOINT DE TESTE TEMPORÁRIO ---
+// --- FIM DA ROTA DE DEBUG ---
 
-// Aplicar middleware de autenticação em todas as rotas
-router.use(authMiddleware);
 
-router.get('/', getProjects);
-router.get('/:id', getProject);
+// Agora, suas rotas normais.
+// Se você tem um `router.use(authMiddleware)` no topo, mantenha-o.
+// Se não, adicione authMiddleware individualmente.
+router.use(authMiddleware); // Se estiver aqui, todas as rotas abaixo serão protegidas.
+
+// Rotas de projetos normais
+router.get('/', getProjects); // Rota para listar todos os projetos
+router.get('/:id', getProject); // Rota para buscar um projeto por ID (a que estava dando "Projeto não encontrado")
 router.post('/', validate(createProjectValidator), createProject);
 router.put('/:id', validate(updateProjectValidator), updateProject);
 router.delete('/:id', deleteProject);
