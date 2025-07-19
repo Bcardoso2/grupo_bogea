@@ -11,7 +11,7 @@ exports.createProjectValidator = Joi.object({
   deadline: Joi.date().iso().optional().allow(null),
   status: Joi.string().valid('planning', 'in_progress', 'on_hold', 'completed', 'cancelled').default('planning'),
   manager_id: Joi.number().integer().positive().required(),
-  progress: Joi.number().integer().min(0).max(100).default(0).optional(), // Permitido como opcional na criação, com default
+  progress: Joi.number().integer().min(0).max(100).default(0).optional(),
   
   // Campos específicos de requerimento
   type_requirement: Joi.string().valid('Salário Maternidade', 'BPC Loas', 'Aposentadoria').optional().allow(null, ''),
@@ -20,8 +20,10 @@ exports.createProjectValidator = Joi.object({
   specific_honorarios: Joi.number().optional().allow(null),
   specific_vara_do_processo: Joi.string().max(255).optional().allow(null, ''),
   specific_tipo_de_deficiencia: Joi.string().max(255).optional().allow(null, ''),
-  specific_data_pericia: Joi.date().iso().optional().allow(null),
-  specific_data_pericia_social: Joi.date().iso().optional().allow(null),
+  // MUDANÇA CRÍTICA AQUI: .allow(null, '') para datas opcionais
+  specific_data_pericia: Joi.date().iso().optional().allow(null, ''), 
+  specific_data_pericia_social: Joi.date().iso().optional().allow(null, ''),
+  
   specific_tipo_aposentadoria: Joi.string().max(255).optional().allow(null, ''),
   specific_numero_processo: Joi.string().max(255).optional().allow(null, ''),
 });
@@ -35,7 +37,7 @@ exports.updateProjectValidator = Joi.object({
   start_date: Joi.date().iso().optional(),
   deadline: Joi.date().iso().optional().allow(null),
   status: Joi.string().valid('planning', 'in_progress', 'on_hold', 'completed', 'cancelled').optional(),
-  progress: Joi.number().integer().min(0).max(100).optional(), // Permitido na atualização
+  progress: Joi.number().integer().min(0).max(100).optional(),
   manager_id: Joi.number().integer().positive().optional(),
   
   // Campos específicos de requerimento para atualização
@@ -45,8 +47,10 @@ exports.updateProjectValidator = Joi.object({
   specific_honorarios: Joi.number().optional().allow(null),
   specific_vara_do_processo: Joi.string().max(255).optional().allow(null, ''),
   specific_tipo_de_deficiencia: Joi.string().max(255).optional().allow(null, ''),
-  specific_data_pericia: Joi.date().iso().optional().allow(null),
-  specific_data_pericia_social: Joi.date().iso().optional().allow(null),
+  // MUDANÇA CRÍTICA AQUI: .allow(null, '') para datas opcionais
+  specific_data_pericia: Joi.date().iso().optional().allow(null, ''),
+  specific_data_pericia_social: Joi.date().iso().optional().allow(null, ''),
+  
   specific_tipo_aposentadoria: Joi.string().max(255).optional().allow(null, ''),
   specific_numero_processo: Joi.string().max(255).optional().allow(null, ''),
 });
