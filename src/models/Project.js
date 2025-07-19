@@ -9,9 +9,13 @@ class Project {
         (name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
+      
+      // Ajuste contract_id se ele pode vir como undefined/null e seu DB não aceita explicitamente.
+      // Se contract_id é opcional, pode ser null.
+      const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
 
       const [result] = await pool.execute(query, [
-        name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id
+        name, description, client_id, finalContractId, start_date, deadline, status, progress, manager_id
       ]);
 
       return {
@@ -19,7 +23,7 @@ class Project {
         name,
         description,
         client_id,
-        contract_id,
+        contract_id: finalContractId, // Retorna o valor ajustado
         start_date,
         deadline,
         status,
@@ -54,7 +58,7 @@ class Project {
 
   static async findAll(filters = {}) {
     try {
-      let query = `
+      let baseQuery = `
         SELECT p.*,
                c.name as client_name,
                ct.title as contract_title,
@@ -65,41 +69,45 @@ class Project {
         LEFT JOIN users u ON p.manager_id = u.id
         WHERE 1=1
       `;
+      const queryConditions = [];
+      const queryParams = [];
 
-      const params = [];
-
+      // Filtros Condicionais
       if (filters.client_id !== undefined && !isNaN(filters.client_id)) {
-        query += ` AND p.client_id = ?`;
-        params.push(filters.client_id);
+        queryConditions.push(`p.client_id = ?`);
+        queryParams.push(filters.client_id);
       }
       if (filters.status !== undefined && filters.status !== '') {
-        query += ` AND p.status = ?`;
-        params.push(filters.status);
+        queryConditions.push(`p.status = ?`);
+        queryParams.push(filters.status);
       }
       if (filters.manager_id !== undefined && !isNaN(filters.manager_id)) {
-        query += ` AND p.manager_id = ?`;
-        params.push(filters.manager_id);
+        queryConditions.push(`p.manager_id = ?`);
+        queryParams.push(filters.manager_id);
       }
       if (filters.search !== undefined && filters.search !== '') {
-        query += ` AND (p.name LIKE ? OR p.description LIKE ?)`;
-        params.push(`%${filters.search}%`);
-        params.push(`%${filters.search}%`);
+        queryConditions.push(`(p.name LIKE ? OR p.description LIKE ?)`);
+        queryParams.push(`%${filters.search}%`, `%${filters.search}%`);
       }
 
-      query += ` ORDER BY p.created_at DESC`;
+      // Adiciona as condições à query base
+      if (queryConditions.length > 0) {
+        baseQuery += ` AND ` + queryConditions.join(' AND ');
+      }
+
+      baseQuery += ` ORDER BY p.created_at DESC`;
 
       // Paginação
-      // Garante que limit e offset são tratados como inteiros puros
       const finalLimit = filters.limit ? parseInt(filters.limit, 10) : 10;
       const finalOffset = (filters.page ? parseInt(filters.page, 10) - 1 : 0) * finalLimit;
 
-      query += ` LIMIT ? OFFSET ?`;
-      params.push(finalLimit, finalOffset); // Passa os valores parseados
+      baseQuery += ` LIMIT ? OFFSET ?`;
+      queryParams.push(finalLimit, finalOffset);
 
-      console.log('DEBUG SQL - findAll Query:', query);
-      console.log('DEBUG SQL - findAll Params:', params);
+      console.log('DEBUG SQL - findAll Query:', baseQuery);
+      console.log('DEBUG SQL - findAll Params:', queryParams);
 
-      const [rows] = await pool.execute(query, params); // Chama o pool.execute com a query e os parâmetros
+      const [rows] = await pool.execute(baseQuery, queryParams);
       return rows;
     } catch (error) {
       console.error('Erro no Project.findAll:', error);
@@ -116,8 +124,12 @@ class Project {
         WHERE id = ?
       `;
 
+      // Ajuste contract_id se ele pode vir como undefined/null e seu DB não aceita explicitamente.
+      const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
+
+
       await pool.execute(query, [
-        name, description, contract_id, start_date, deadline, status, progress, manager_id, id
+        name, description, finalContractId, start_date, deadline, status, progress, manager_id, id
       ]);
 
       return this.findById(id);
@@ -138,31 +150,35 @@ class Project {
 
   static async count(filters = {}) {
     try {
-      let query = `SELECT COUNT(*) as total FROM projects WHERE 1=1`;
-      const params = [];
+      let baseQuery = `SELECT COUNT(*) as total FROM projects WHERE 1=1`;
+      const queryConditions = [];
+      const queryParams = [];
 
       if (filters.client_id !== undefined && !isNaN(filters.client_id)) {
-        query += ` AND client_id = ?`;
-        params.push(filters.client_id);
+        queryConditions.push(`client_id = ?`);
+        queryParams.push(filters.client_id);
       }
       if (filters.status !== undefined && filters.status !== '') {
-        query += ` AND status = ?`;
-        params.push(filters.status);
+        queryConditions.push(`status = ?`);
+        queryParams.push(filters.status);
       }
       if (filters.manager_id !== undefined && !isNaN(filters.manager_id)) {
-        query += ` AND manager_id = ?`;
-        params.push(filters.manager_id);
+        queryConditions.push(`manager_id = ?`);
+        queryParams.push(filters.manager_id);
       }
       if (filters.search !== undefined && filters.search !== '') {
-        query += ` AND (name LIKE ? OR description LIKE ?)`;
-        params.push(`%${filters.search}%`);
-        params.push(`%${filters.search}%`);
+        queryConditions.push(`(name LIKE ? OR description LIKE ?)`);
+        queryParams.push(`%${filters.search}%`, `%${filters.search}%`);
       }
 
-      console.log('DEBUG SQL - count Query:', query);
-      console.log('DEBUG SQL - count Params:', params);
+      if (queryConditions.length > 0) {
+        baseQuery += ` AND ` + queryConditions.join(' AND ');
+      }
 
-      const [rows] = await pool.execute(query, params);
+      console.log('DEBUG SQL - count Query:', baseQuery);
+      console.log('DEBUG SQL - count Params:', queryParams);
+
+      const [rows] = await pool.execute(baseQuery, queryParams);
       return rows[0].total;
     } catch (error) {
       console.error('Erro no Project.count:', error);
