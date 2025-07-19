@@ -2,7 +2,57 @@
 const { pool } = require('../config/database');
 
 class Project {
-  // ... (create, findById)
+  static async create({ name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id }) {
+    try {
+      const query = `
+        INSERT INTO projects
+        (name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
+
+      const [result] = await pool.execute(query, [
+        name, description, client_id, finalContractId, start_date, deadline, status, progress, manager_id
+      ]);
+
+      return {
+        id: result.insertId,
+        name,
+        description,
+        client_id,
+        contract_id: finalContractId,
+        start_date,
+        deadline,
+        status,
+        progress,
+        manager_id
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async findById(id) {
+    try {
+      const query = `
+        SELECT p.*,
+               c.name as client_name,
+               ct.title as contract_title,
+               u.name as manager_name
+        FROM projects p
+        LEFT JOIN clients c ON p.client_id = c.id
+        LEFT JOIN contracts ct ON p.contract_id = ct.id
+        LEFT JOIN users u ON p.manager_id = u.id
+        WHERE p.id = ?
+      `;
+
+      const [rows] = await pool.execute(query, [id]);
+      return rows[0] || null;
+    } catch (error) {
+      throw error;
+    }
+  }
 
   static async findAll(filters = {}) {
     try {
@@ -43,21 +93,16 @@ class Project {
 
       baseQuery += ` ORDER BY p.created_at DESC`;
 
-      // Paginação - MUDANÇA CRÍTICA AQUI
       const finalLimit = filters.limit ? parseInt(filters.limit, 10) : 10;
       const finalOffset = (filters.page ? parseInt(filters.page, 10) - 1 : 0) * finalLimit;
 
-      // CONCATENA LIMIT E OFFSET DIRETAMENTE NA STRING DA QUERY
-      baseQuery += ` LIMIT ${finalLimit} OFFSET ${finalOffset}`; // <--- MUDANÇA AQUI: SEM PLACEHOLDERS `?`
-
-      // Não adicione finalLimit e finalOffset ao queryParams aqui, pois eles foram concatenados diretamente
-      // queryParams.push(finalLimit, finalOffset); // <--- REMOVA ESSA LINHA SE ESTIVER NO SEU CÓDIGO
+      baseQuery += ` LIMIT ${finalLimit} OFFSET ${finalOffset}`;
 
       console.log('DEBUG SQL - findAll Query:', baseQuery);
-      console.log('DEBUG SQL - findAll Params:', queryParams); // Os parâmetros de paginação NÃO estarão aqui agora
+      console.log('DEBUG SQL - findAll Params:', queryParams);
       console.log('DEBUG SQL - findAll Param Types:', queryParams.map(p => typeof p));
 
-      const [rows] = await pool.execute(baseQuery, queryParams); // pool.execute só receberá parâmetros para filtros opcionais agora
+      const [rows] = await pool.execute(baseQuery, queryParams);
       return rows;
     } catch (error) {
       console.error('Erro no Project.findAll:', error);
@@ -65,7 +110,36 @@ class Project {
     }
   }
 
-  // ... (update, delete)
+  static async update(id, { name, description, contract_id, start_date, deadline, status, progress, manager_id }) {
+    try {
+      const query = `
+        UPDATE projects
+        SET name = ?, description = ?, contract_id = ?, start_date = ?, deadline = ?,
+            status = ?, progress = ?, manager_id = ?
+        WHERE id = ?
+      `;
+
+      const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
+
+      await pool.execute(query, [
+        name, description, finalContractId, start_date, deadline, status, progress, manager_id, id
+      ]);
+
+      return this.findById(id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async delete(id) {
+    try {
+      const query = `DELETE FROM projects WHERE id = ?`;
+      await pool.execute(query, [id]);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
 
   static async count(filters = {}) {
     try {
@@ -106,7 +180,29 @@ class Project {
     }
   }
 
-  // ... (updateProgress)
+  static async updateProgress(projectId) {
+    try {
+      const query = `
+        SELECT
+          COUNT(*) as total_tasks,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
+        FROM project_tasks
+        WHERE project_id = ?
+      `;
+
+      const [rows] = await pool.execute(query, [projectId]);
+      const { total_tasks, completed_tasks } = rows[0];
+
+      const progress = total_tasks > 0 ? Math.round((completed_tasks / total_tasks) * 100) : 0;
+
+      const updateQuery = `UPDATE projects SET progress = ? WHERE id = ?`;
+      await pool.execute(updateQuery, [progress, projectId]);
+
+      return progress;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = Project;
