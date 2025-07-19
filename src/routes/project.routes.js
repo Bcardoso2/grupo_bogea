@@ -20,6 +20,17 @@ const { createProjectValidator, updateProjectValidator } = require('../validator
 // Aplicar middleware de autenticação em todas as rotas
 router.use(authMiddleware);
 
+router.get('/test-db-query', async (req, res) => {
+  try {
+    const testQuery = 'SELECT 1 + 1 AS solution';
+    const [rows] = await pool.execute(testQuery);
+    console.log('TESTE DB: Query simples executada:', rows);
+    res.json({ success: true, message: 'Teste de query simples OK', data: rows[0] });
+  } catch (error) {
+    console.error('TESTE DB: ERRO NA QUERY SIMPLES:', error);
+    res.status(500).json({ success: false, message: 'Erro no teste de query simples', error: error.message });
+  }
+});
 router.get('/', getProjects);
 router.get('/:id', getProject);
 router.post('/', validate(createProjectValidator), createProject);
