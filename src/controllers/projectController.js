@@ -1,8 +1,11 @@
 // server/src/controllers/projectController.js
-const Project = require('../models/Project');
+const Project = require('../models/Project'); // Importa a classe Project
 const ProjectTask = require('../models/ProjectTask');
 const { success, error, created, notFound } = require('../utils/responseHelper');
 const asyncHandler = require('../utils/asyncHandler');
+
+console.log('DEBUG_MODULE: Project object after import in controller:', Project);
+console.log('DEBUG_MODULE: Type of Project.create in controller:', typeof Project.create);
 
 exports.getProjects = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, search, status, client_id, manager_id } = req.query;
@@ -63,9 +66,6 @@ exports.createProject = asyncHandler(async (req, res) => {
 
   const project = await Project.create(projectData);
 
-  // TODO: Lógica para salvar campos específicos (specificDetails)
-  // Isso será a próxima etapa no backend, uma vez que a listagem funcione.
-
   created(res, project, 'Projeto criado com sucesso');
 });
 
@@ -91,9 +91,6 @@ exports.updateProject = asyncHandler(async (req, res) => {
   };
 
   const updatedProject = await Project.update(id, updatedData);
-
-  // TODO: Lógica para atualizar campos específicos (specificDetails)
-  // Próxima etapa no backend.
 
   success(res, updatedProject, 'Projeto atualizado com sucesso');
 });
