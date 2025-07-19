@@ -10,8 +10,6 @@ class Project {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
-      // Ajuste contract_id se ele pode vir como undefined/null e seu DB não aceita explicitamente.
-      // Se contract_id é opcional, pode ser null.
       const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
 
       const [result] = await pool.execute(query, [
@@ -23,7 +21,7 @@ class Project {
         name,
         description,
         client_id,
-        contract_id: finalContractId, // Retorna o valor ajustado
+        contract_id: finalContractId,
         start_date,
         deadline,
         status,
@@ -72,7 +70,6 @@ class Project {
       const queryConditions = [];
       const queryParams = [];
 
-      // Filtros Condicionais
       if (filters.client_id !== undefined && !isNaN(filters.client_id)) {
         queryConditions.push(`p.client_id = ?`);
         queryParams.push(filters.client_id);
@@ -90,14 +87,12 @@ class Project {
         queryParams.push(`%${filters.search}%`, `%${filters.search}%`);
       }
 
-      // Adiciona as condições à query base
       if (queryConditions.length > 0) {
         baseQuery += ` AND ` + queryConditions.join(' AND ');
       }
 
       baseQuery += ` ORDER BY p.created_at DESC`;
 
-      // Paginação
       const finalLimit = filters.limit ? parseInt(filters.limit, 10) : 10;
       const finalOffset = (filters.page ? parseInt(filters.page, 10) - 1 : 0) * finalLimit;
 
@@ -106,6 +101,7 @@ class Project {
 
       console.log('DEBUG SQL - findAll Query:', baseQuery);
       console.log('DEBUG SQL - findAll Params:', queryParams);
+      console.log('DEBUG SQL - findAll Param Types:', queryParams.map(p => typeof p)); // Loga o tipo de cada parâmetro
 
       const [rows] = await pool.execute(baseQuery, queryParams);
       return rows;
@@ -124,9 +120,7 @@ class Project {
         WHERE id = ?
       `;
 
-      // Ajuste contract_id se ele pode vir como undefined/null e seu DB não aceita explicitamente.
       const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
-
 
       await pool.execute(query, [
         name, description, finalContractId, start_date, deadline, status, progress, manager_id, id
@@ -177,6 +171,7 @@ class Project {
 
       console.log('DEBUG SQL - count Query:', baseQuery);
       console.log('DEBUG SQL - count Params:', queryParams);
+      console.log('DEBUG SQL - count Param Types:', queryParams.map(p => typeof p)); // Loga o tipo de cada parâmetro
 
       const [rows] = await pool.execute(baseQuery, queryParams);
       return rows[0].total;
