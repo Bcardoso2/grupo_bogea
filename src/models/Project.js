@@ -1,33 +1,42 @@
 // server/src/models/Project.js
 const { pool } = require('../config/database');
+const ProjectSalarioMaternidade = require('./ProjectSalarioMaternidade');
+const ProjectBPC = require('./ProjectBPC');
+const ProjectAposentadoria = require('./ProjectAposentadoria');
 
 class Project {
-  static async create({ name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id }) {
+  static async create({ name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id, type_requirement, specificDetails }) {
     try {
       const query = `
         INSERT INTO projects
-        (name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id, type_requirement)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
       const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
 
       const [result] = await pool.execute(query, [
-        name, description, client_id, finalContractId, start_date, deadline, status, progress, manager_id
+        name, description, client_id, finalContractId, start_date, deadline, status, progress, manager_id, type_requirement || null
       ]);
 
-      return {
-        id: result.insertId,
-        name,
-        description,
-        client_id,
-        contract_id: finalContractId,
-        start_date,
-        deadline,
-        status,
-        progress,
-        manager_id
-      };
+      const projectId = result.insertId;
+
+      // Se houver detalhes específicos, chame o modelo correto para criá-los
+      if (projectId && type_requirement && specificDetails) {
+        switch (type_requirement) {
+          case 'Salário Maternidade':
+            await ProjectSalarioMaternidade.create(projectId, specificDetails);
+            break;
+          case 'BPC Loas':
+            await ProjectBPC.create(projectId, specificDetails);
+            break;
+          case 'Aposentadoria':
+            await ProjectAposentadoria.create(projectId, specificDetails);
+            break;
+        }
+      }
+
+      return this.findById(projectId); // Retorna o projeto completo, incluindo os detalhes recém-criados
     } catch (error) {
       throw error;
     }
@@ -48,7 +57,87 @@ class Project {
       `;
 
       const [rows] = await pool.execute(query, [id]);
-      return rows[0] || null;
+      const project = rows[0] || null;
+
+      if (project) {
+        let specificDetails = null;
+        switch (project.type_requirement) {
+          case 'Salário Maternidade':
+            specificDetails = await ProjectSalarioMaternidade.findByProjectId(project.id);
+            break;
+          case 'BPC Loas':
+            specificDetails = await ProjectBPC.findByProjectId(project.id);
+            break;
+          case 'Aposentadoria':
+            specificDetails = await ProjectAposentadoria.findByProjectId(project.id);
+            break;
+        }
+        // Retorne o projeto com os detalhes específicos anexados
+        return { ...project, ...specificDetails };
+      }
+      return null;
+    } catch (error) {
+      throw error;
+    }
+  }
+  
+  // O resto dos métodos (findAll, update, delete, count, updateProgress) do Project.js
+  // Você já os tem na última versão, então não precisam ser repetidos aqui.
+  // Eles já contêm a lógica de paginação e filtros que resolveu o problema anterior.
+  // Lembre-se apenas de ajustar o `update` para que ele também atualize os detalhes específicos.
+  
+  static async update(id, { name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id, type_requirement, specificDetails }) {
+    try {
+      const query = `
+        UPDATE projects
+        SET name = ?, description = ?, client_id = ?, contract_id = ?, start_date = ?, deadline = ?,
+            status = ?, progress = ?, manager_id = ?, type_requirement = ?
+        WHERE id = ?
+      `;
+
+      const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
+
+      await pool.execute(query, [
+        name, description, client_id, finalContractId, start_date, deadline, status, progress, manager_id, type_requirement || null, id
+      ]);
+
+      // Lógica para atualizar ou criar os detalhes específicos
+      if (type_requirement && specificDetails) {
+        let existingDetails;
+        switch (type_requirement) {
+          case 'Salário Maternidade':
+            existingDetails = await ProjectSalarioMaternidade.findByProjectId(id);
+            if (existingDetails) {
+              await ProjectSalarioMaternidade.update(id, specificDetails);
+            } else {
+              await ProjectSalarioMaternidade.create(id, specificDetails);
+            }
+            break;
+          case 'BPC Loas':
+            existingDetails = await ProjectBPC.findByProjectId(id);
+            if (existingDetails) {
+              await ProjectBPC.update(id, specificDetails);
+            } else {
+              await ProjectBPC.create(id, specificDetails);
+            }
+            break;
+          case 'Aposentadoria':
+            existingDetails = await ProjectAposentadoria.findByProjectId(id);
+            if (existingDetails) {
+              await ProjectAposentadoria.update(id, specificDetails);
+            } else {
+              await ProjectAposentadoria.create(id, specificDetails);
+            }
+            break;
+        }
+      } else if (type_requirement === null || type_requirement === undefined || type_requirement === '') {
+        // Se o tipo de requerimento for removido ou não especificado, delete os detalhes existentes
+        await ProjectSalarioMaternidade.deleteByProjectId(id);
+        await ProjectBPC.deleteByProjectId(id);
+        await ProjectAposentadoria.deleteByProjectId(id);
+      }
+
+      return this.findById(id);
     } catch (error) {
       throw error;
     }
@@ -59,11 +148,9 @@ class Project {
       let baseQuery = `
         SELECT p.*,
                c.name as client_name,
-               ct.title as contract_title,
                u.name as manager_name
         FROM projects p
         LEFT JOIN clients c ON p.client_id = c.id
-        LEFT JOIN contracts ct ON p.contract_id = ct.id
         LEFT JOIN users u ON p.manager_id = u.id
         WHERE 1=1
       `;
@@ -98,34 +185,8 @@ class Project {
 
       baseQuery += ` LIMIT ${finalLimit} OFFSET ${finalOffset}`;
 
-      console.log('DEBUG SQL - findAll Query:', baseQuery);
-      console.log('DEBUG SQL - findAll Params:', queryParams);
-      console.log('DEBUG SQL - findAll Param Types:', queryParams.map(p => typeof p));
-
       const [rows] = await pool.execute(baseQuery, queryParams);
       return rows;
-    } catch (error) {
-      console.error('Erro no Project.findAll:', error);
-      throw error;
-    }
-  }
-
-  static async update(id, { name, description, contract_id, start_date, deadline, status, progress, manager_id }) {
-    try {
-      const query = `
-        UPDATE projects
-        SET name = ?, description = ?, contract_id = ?, start_date = ?, deadline = ?,
-            status = ?, progress = ?, manager_id = ?
-        WHERE id = ?
-      `;
-
-      const finalContractId = contract_id === undefined || contract_id === '' ? null : contract_id;
-
-      await pool.execute(query, [
-        name, description, finalContractId, start_date, deadline, status, progress, manager_id, id
-      ]);
-
-      return this.findById(id);
     } catch (error) {
       throw error;
     }
@@ -133,8 +194,9 @@ class Project {
 
   static async delete(id) {
     try {
-      const query = `DELETE FROM projects WHERE id = ?`;
-      await pool.execute(query, [id]);
+      // Como você tem ON DELETE CASCADE, a exclusão dos detalhes é automática.
+      // Apenas exclua o projeto principal.
+      await pool.execute('DELETE FROM projects WHERE id = ?', [id]);
       return true;
     } catch (error) {
       throw error;
@@ -168,37 +230,8 @@ class Project {
         baseQuery += ` AND ` + queryConditions.join(' AND ');
       }
 
-      console.log('DEBUG SQL - count Query:', baseQuery);
-      console.log('DEBUG SQL - count Params:', queryParams);
-      console.log('DEBUG SQL - count Param Types:', queryParams.map(p => typeof p));
-
       const [rows] = await pool.execute(baseQuery, queryParams);
       return rows[0].total;
-    } catch (error) {
-      console.error('Erro no Project.count:', error);
-      throw error;
-    }
-  }
-
-  static async updateProgress(projectId) {
-    try {
-      const query = `
-        SELECT
-          COUNT(*) as total_tasks,
-          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
-        FROM project_tasks
-        WHERE project_id = ?
-      `;
-
-      const [rows] = await pool.execute(query, [projectId]);
-      const { total_tasks, completed_tasks } = rows[0];
-
-      const progress = total_tasks > 0 ? Math.round((completed_tasks / total_tasks) * 100) : 0;
-
-      const updateQuery = `UPDATE projects SET progress = ? WHERE id = ?`;
-      await pool.execute(updateQuery, [progress, projectId]);
-
-      return progress;
     } catch (error) {
       throw error;
     }
