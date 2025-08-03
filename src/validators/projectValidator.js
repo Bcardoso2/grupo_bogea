@@ -1,7 +1,6 @@
 // server/src/validators/projectValidator.js
 const Joi = require('joi');
 
-// Validador para criação de projeto
 exports.createProjectValidator = Joi.object({
   name: Joi.string().min(3).max(255).required(),
   description: Joi.string().max(1000).allow(null, ''),
@@ -20,15 +19,12 @@ exports.createProjectValidator = Joi.object({
   specific_honorarios: Joi.number().optional().allow(null),
   specific_vara_do_processo: Joi.string().max(255).optional().allow(null, ''),
   specific_tipo_de_deficiencia: Joi.string().max(255).optional().allow(null, ''),
-  // MUDANÇA CRÍTICA AQUI: .allow(null, '') para datas opcionais
-  specific_data_pericia: Joi.date().iso().optional().allow(null, ''), 
+  specific_data_pericia: Joi.date().iso().optional().allow(null, ''),
   specific_data_pericia_social: Joi.date().iso().optional().allow(null, ''),
-  
   specific_tipo_aposentadoria: Joi.string().max(255).optional().allow(null, ''),
   specific_numero_processo: Joi.string().max(255).optional().allow(null, ''),
 });
 
-// Validador para atualização de projeto
 exports.updateProjectValidator = Joi.object({
   name: Joi.string().min(3).max(255).optional(),
   description: Joi.string().max(1000).optional().allow(null, ''),
@@ -47,10 +43,8 @@ exports.updateProjectValidator = Joi.object({
   specific_honorarios: Joi.number().optional().allow(null),
   specific_vara_do_processo: Joi.string().max(255).optional().allow(null, ''),
   specific_tipo_de_deficiencia: Joi.string().max(255).optional().allow(null, ''),
-  // MUDANÇA CRÍTICA AQUI: .allow(null, '') para datas opcionais
   specific_data_pericia: Joi.date().iso().optional().allow(null, ''),
   specific_data_pericia_social: Joi.date().iso().optional().allow(null, ''),
-  
   specific_tipo_aposentadoria: Joi.string().max(255).optional().allow(null, ''),
   specific_numero_processo: Joi.string().max(255).optional().allow(null, ''),
 });
