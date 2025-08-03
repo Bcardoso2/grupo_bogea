@@ -42,19 +42,15 @@ exports.getProject = asyncHandler(async (req, res) => {
 });
 
 exports.createProject = asyncHandler(async (req, res) => {
-  // Desestruture todos os campos que vêm do frontend, incluindo os específicos
-  const { 
-    name, description, client_id, contract_id, start_date, deadline, status, manager_id, type_requirement, 
-    specific_ocupacao, specific_filho_ano, specific_honorarios, specific_vara_do_processo,
-    specific_tipo_de_deficiencia, specific_data_pericia, specific_data_pericia_social,
-    specific_tipo_aposentadoria, specific_numero_processo 
-  } = req.body;
+  const { name, description, client_id, contract_id, start_date, deadline, status, manager_id, type_requirement, 
+          specific_ocupacao, specific_filho_ano, specific_honorarios, specific_vara_do_processo,
+          specific_tipo_de_deficiencia, specific_data_pericia, specific_data_pericia_social,
+          specific_tipo_aposentadoria, specific_numero_processo } = req.body;
 
   if (!name || !client_id || !manager_id || !start_date) {
     return error(res, 'Nome, Cliente, Responsável e Data de Início são obrigatórios.', 400);
   }
 
-  // Crie o objeto `specificDetails` com os nomes de coluna do banco de dados
   const specificDetails = {
     ocupacao: specific_ocupacao,
     filho_ano: specific_filho_ano,
@@ -68,17 +64,9 @@ exports.createProject = asyncHandler(async (req, res) => {
   };
 
   const projectData = {
-    name,
-    description,
-    client_id,
-    contract_id,
-    start_date,
-    deadline,
-    status: status || 'planning',
-    progress: 0,
-    manager_id,
-    type_requirement,
-    specificDetails, // Passe o objeto mapeado para o modelo
+    name, description, client_id, contract_id, start_date, deadline,
+    status: status || 'planning', progress: 0, manager_id,
+    type_requirement, specificDetails,
   };
 
   const project = await Project.create(projectData);
@@ -88,12 +76,10 @@ exports.createProject = asyncHandler(async (req, res) => {
 
 exports.updateProject = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { 
-    name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id, type_requirement,
-    specific_ocupacao, specific_filho_ano, specific_honorarios, specific_vara_do_processo,
-    specific_tipo_de_deficiencia, specific_data_pericia, specific_data_pericia_social,
-    specific_tipo_aposentadoria, specific_numero_processo 
-  } = req.body;
+  const { name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id, type_requirement,
+          specific_ocupacao, specific_filho_ano, specific_honorarios, specific_vara_do_processo,
+          specific_tipo_de_deficiencia, specific_data_pericia, specific_data_pericia_social,
+          specific_tipo_aposentadoria, specific_numero_processo } = req.body;
 
   const existingProject = await Project.findById(id);
   if (!existingProject) {
@@ -113,17 +99,9 @@ exports.updateProject = asyncHandler(async (req, res) => {
   };
 
   const updatedData = {
-    name,
-    description,
-    client_id,
+    name, description, client_id,
     contract_id: contract_id === '' ? null : contract_id,
-    start_date,
-    deadline,
-    status,
-    progress,
-    manager_id,
-    type_requirement,
-    specificDetails, // Passe o objeto mapeado para o modelo
+    start_date, deadline, status, progress, manager_id, type_requirement, specificDetails,
   };
 
   const updatedProject = await Project.update(id, updatedData);
@@ -133,15 +111,67 @@ exports.updateProject = asyncHandler(async (req, res) => {
 
 exports.deleteProject = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
   const project = await Project.findById(id);
   if (!project) {
     return notFound(res, 'Projeto não encontrado');
   }
-
   await Project.delete(id);
-
   success(res, null, 'Projeto excluído com sucesso');
 });
 
-// ... (Restante do controller)
+// --- FUNÇÕES DE TAREFA: EXPORTE CADA UMA COM 'exports.' ---
+exports.getProjectTasks = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, priority, assigned_to } = req.query;
+  const project = await Project.findById(id);
+  if (!project) {
+    return notFound(res, 'Projeto não encontrado');
+  }
+  const filters = {
+    status: status === '' ? undefined : status,
+    priority: priority === '' ? undefined : priority,
+    assigned_to: assigned_to === '' ? undefined : (assigned_to ? parseInt(assigned_to) : undefined)
+  };
+  const tasks = await ProjectTask.findByProject(id, filters);
+  success(res, tasks);
+});
+
+exports.createProjectTask = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { title, description, status = 'to_do', priority = 'medium', assigned_to, start_date, due_date } = req.body;
+  const project = await Project.findById(id);
+  if (!project) {
+    return notFound(res, 'Projeto não encontrado');
+  }
+  if (!title) {
+    return error(res, 'Título da tarefa é obrigatório.', 400);
+  }
+  const task = await ProjectTask.create({
+    project_id: id,
+    title, description, status, priority, assigned_to, start_date, due_date
+  });
+  created(res, task, 'Tarefa criada com sucesso');
+});
+
+exports.updateProjectTask = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const { title, description, status, priority, assigned_to, start_date, due_date } = req.body;
+  const existingTask = await ProjectTask.findById(taskId);
+  if (!existingTask) {
+    return notFound(res, 'Tarefa não encontrada');
+  }
+  const updatedTask = await ProjectTask.update(taskId, {
+    title, description, status, priority, assigned_to, start_date, due_date
+  });
+  success(res, updatedTask, 'Tarefa atualizada com sucesso');
+});
+
+exports.deleteProjectTask = asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const task = await ProjectTask.findById(taskId);
+  if (!task) {
+    return notFound(res, 'Tarefa não encontrada');
+  }
+  await ProjectTask.delete(taskId);
+  success(res, null, 'Tarefa excluída com sucesso');
+});
