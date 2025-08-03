@@ -1,11 +1,7 @@
 // server/src/controllers/projectController.js
-const Project = require('../models/Project'); // Importa a classe Project
-const ProjectTask = require('../models/ProjectTask');
+const Project = require('../models/Project');
 const { success, error, created, notFound } = require('../utils/responseHelper');
 const asyncHandler = require('../utils/asyncHandler');
-
-console.log('DEBUG_MODULE: Project object after import in controller:', Project);
-console.log('DEBUG_MODULE: Type of Project.create in controller:', typeof Project.create);
 
 exports.getProjects = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, search, status, client_id, manager_id } = req.query;
@@ -61,7 +57,8 @@ exports.createProject = asyncHandler(async (req, res) => {
     status: status || 'planning',
     progress: 0,
     manager_id,
-    type_requirement: type_requirement || undefined,
+    type_requirement,
+    specificDetails,
   };
 
   const project = await Project.create(projectData);
@@ -71,7 +68,7 @@ exports.createProject = asyncHandler(async (req, res) => {
 
 exports.updateProject = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, description, contract_id, start_date, deadline, status, progress, manager_id, type_requirement, ...specificDetails } = req.body;
+  const { name, description, client_id, contract_id, start_date, deadline, status, progress, manager_id, type_requirement, ...specificDetails } = req.body;
 
   const existingProject = await Project.findById(id);
   if (!existingProject) {
@@ -81,13 +78,15 @@ exports.updateProject = asyncHandler(async (req, res) => {
   const updatedData = {
     name,
     description,
+    client_id,
     contract_id: contract_id === '' ? null : contract_id,
     start_date,
     deadline,
     status,
     progress,
     manager_id,
-    type_requirement: type_requirement || undefined,
+    type_requirement,
+    specificDetails,
   };
 
   const updatedProject = await Project.update(id, updatedData);
